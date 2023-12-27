@@ -611,8 +611,8 @@ void PDFDoc::displayPage(OutputDev *out, int page, double hDPI, double vDPI, int
         printf("***** page %d *****\n", page);
     }
 
-    if (getPage(page)) {
-        getPage(page)->display(out, hDPI, vDPI, rotate, useMediaBox, crop, printing, abortCheckCbk, abortCheckCbkData, annotDisplayDecideCbk, annotDisplayDecideCbkData, copyXRef);
+    if (auto page_ptr = getPage(page)) {
+        page_ptr->display(out, hDPI, vDPI, rotate, useMediaBox, crop, printing, abortCheckCbk, abortCheckCbkData, annotDisplayDecideCbk, annotDisplayDecideCbkData, copyXRef);
     }
 }
 

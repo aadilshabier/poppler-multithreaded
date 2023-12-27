@@ -8,3 +8,11 @@ Steps to build:
 4. ninja -j 4 pdftohtml
 5. Run using
    ./build/utils/pdftohtml -xml Digestive\ System\ Disease\ And\ Discorders\ -\ mix\ of\ text\ and\ images.pdf ./output/Output.xml
+
+Descending the time-spent tree:
+1. Most time is spent in Page::display()
+2. This is Page::displaySlice()
+3. Most time is spent in Gfx::display()
+4. This is Gfx::go()
+5. Gfx::opXObject()
+6. Gfx::doImage()

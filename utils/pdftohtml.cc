@@ -72,6 +72,10 @@
 #include "Win32Console.h"
 #include "InMemoryFile.h"
 
+#include <thread>
+#include <vector>
+#include <cmath>
+
 static int firstPage = 1;
 static int lastPage = 0;
 static bool rawOrder = true;
@@ -91,7 +95,7 @@ bool noRoundedCoordinates = false;
 static bool errQuiet = false;
 static bool noDrm = false;
 double wordBreakThreshold = 10; // 10%, below converted into a coefficient - 0.1
-bool timeXML = true;
+int jobs = 1;
 
 bool showHidden = false;
 bool noMerge = false;
@@ -107,6 +111,7 @@ static char textEncName[128] = "";
 
 static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to convert" },
                                    { "-l", argInt, &lastPage, 0, "last page to convert" },
+                                   { "-j", argInt, &jobs, 0, "number of jobs" },
                                    /*{"-raw",    argFlag,     &rawOrder,      0,
                                      "keep strings in content stream order"},*/
                                    { "-q", argFlag, &errQuiet, 0, "don't print any messages or errors" },
@@ -117,7 +122,6 @@ static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to
                                    { "-p", argFlag, &printHtml, 0, "exchange .pdf links by .html" },
                                    { "-c", argFlag, &complexMode, 0, "generate complex document" },
                                    { "-s", argFlag, &singleHtml, 0, "generate single document that includes all pages" },
-								   { "-t", argFlag, &timeXML, 0, "time xml creation" },
 #ifdef HAVE_IN_MEMORY_FILE
                                    { "-dataurls", argFlag, &dataUrls, 0, "use data URLs instead of external images in HTML" },
 #endif
@@ -163,8 +167,6 @@ int main(int argc, char *argv[])
     GooString *docTitle = nullptr;
     GooString *author = nullptr, *keywords = nullptr, *subject = nullptr, *date = nullptr;
     GooString *htmlFileName = nullptr;
-    HtmlOutputDev *htmlOut = nullptr;
-    SplashOutputDev *splashOut = nullptr;
     bool doOutline;
     bool ok;
     std::optional<GooString> ownerPW, userPW;
@@ -329,10 +331,38 @@ int main(int argc, char *argv[])
     }
 
     doOutline = doc->getOutline()->getItems() != nullptr;
-    // write text file
-    htmlOut = new HtmlOutputDev(doc->getCatalog(), htmlFileName->c_str(), docTitle->c_str(), author ? author->c_str() : nullptr, keywords ? keywords->c_str() : nullptr, subject ? subject->c_str() : nullptr, date ? date->c_str() : nullptr,
-                                rawOrder, firstPage, doOutline);
-    delete docTitle;
+
+	// scope to allow goto to worj
+	{
+		const auto f = [=](PDFDoc* doc, int i, int startPage, int endPage) {
+			std::string out_file = "output/file" + std::to_string(i);
+			auto out = HtmlOutputDev(doc->getCatalog(), out_file.c_str(), docTitle->c_str(), author ? author->c_str() : nullptr, keywords ? keywords->c_str() : nullptr, subject ? subject->c_str() : nullptr, date ? date->c_str() : nullptr, rawOrder, firstPage, doOutline);
+
+			doc->displayPages(&out, startPage, endPage, 72 * scale, 72 * scale, 0, true, false, false);
+			out.dumpDocOutline(doc);
+		};
+
+		std::vector<std::thread> threads(jobs);
+		const int d = ceil(static_cast<float>(lastPage-firstPage+1) / static_cast<float>(jobs));
+		for (int i=0; i<jobs; i++) {
+			int startPage = firstPage + i*d;
+			int endPage = std::min(lastPage, firstPage-1 + (i+1)*d);
+			printf("%d - %d\n", startPage, endPage);
+			threads[i] = std::thread(f, doc.get(), i, startPage, endPage);
+		}
+		for (auto &t : threads) {
+			t.join();
+		}
+	}
+
+    exit_status = EXIT_SUCCESS;
+
+    // clean up
+error:
+    delete fileName;
+
+	delete docTitle;
+
     if (author) {
         delete author;
     }
@@ -345,57 +375,6 @@ int main(int argc, char *argv[])
     if (date) {
         delete date;
     }
-
-    if ((complexMode || singleHtml) && !xml && !ignore) {
-        // White paper color
-        SplashColor color;
-        color[0] = color[1] = color[2] = 255;
-        // If the user specified "jpg" use JPEG, otherwise PNG
-        SplashImageFileFormat format = strcmp(extension, "jpg") ? splashFormatPng : splashFormatJpeg;
-
-        splashOut = new SplashOutputDevNoText(splashModeRGB8, 4, false, color);
-        splashOut->startDoc(doc.get());
-
-        for (int pg = firstPage; pg <= lastPage; ++pg) {
-            InMemoryFile imf;
-            doc->displayPage(splashOut, pg, 72 * scale, 72 * scale, 0, true, false, false);
-            SplashBitmap *bitmap = splashOut->getBitmap();
-
-            const std::unique_ptr<GooString> imgFileName = GooString::format("{0:s}{1:03d}.{2:s}", htmlFileName->c_str(), pg, extension);
-            auto f1 = dataUrls ? imf.open("wb") : fopen(imgFileName->c_str(), "wb");
-            if (!f1) {
-                fprintf(stderr, "Could not open %s\n", imgFileName->c_str());
-                continue;
-            }
-            bitmap->writeImgFile(format, f1, 72 * scale, 72 * scale);
-            fclose(f1);
-            if (dataUrls) {
-                htmlOut->addBackgroundImage(std::string((format == splashFormatJpeg) ? "data:image/jpeg;base64," : "data:image/png;base64,") + gbase64Encode(imf.getBuffer()));
-            } else {
-                htmlOut->addBackgroundImage(gbasename(imgFileName->c_str()));
-            }
-        }
-
-        delete splashOut;
-    }
-
-    if (htmlOut->isOk()) {
-		auto start = clock();
-        doc->displayPages(htmlOut, firstPage, lastPage, 72 * scale, 72 * scale, 0, true, false, false);
-        htmlOut->dumpDocOutline(doc.get());
-		auto end = clock();
-		auto duration_ms = (end - start)*1000/CLOCKS_PER_SEC;
-		if (timeXML)
-			printf("%f seconds taken.\n", (float)duration_ms/1000.f);
-    }
-
-    delete htmlOut;
-
-    exit_status = EXIT_SUCCESS;
-
-    // clean up
-error:
-    delete fileName;
 
     if (htmlFileName) {
         delete htmlFileName;
