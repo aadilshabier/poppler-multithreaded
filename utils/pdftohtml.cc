@@ -91,6 +91,7 @@ bool noRoundedCoordinates = false;
 static bool errQuiet = false;
 static bool noDrm = false;
 double wordBreakThreshold = 10; // 10%, below converted into a coefficient - 0.1
+bool timeXML = true;
 
 bool showHidden = false;
 bool noMerge = false;
@@ -116,6 +117,7 @@ static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to
                                    { "-p", argFlag, &printHtml, 0, "exchange .pdf links by .html" },
                                    { "-c", argFlag, &complexMode, 0, "generate complex document" },
                                    { "-s", argFlag, &singleHtml, 0, "generate single document that includes all pages" },
+								   { "-t", argFlag, &timeXML, 0, "time xml creation" },
 #ifdef HAVE_IN_MEMORY_FILE
                                    { "-dataurls", argFlag, &dataUrls, 0, "use data URLs instead of external images in HTML" },
 #endif
@@ -378,8 +380,13 @@ int main(int argc, char *argv[])
     }
 
     if (htmlOut->isOk()) {
+		auto start = clock();
         doc->displayPages(htmlOut, firstPage, lastPage, 72 * scale, 72 * scale, 0, true, false, false);
         htmlOut->dumpDocOutline(doc.get());
+		auto end = clock();
+		auto duration_ms = (end - start)*1000/CLOCKS_PER_SEC;
+		if (timeXML)
+			printf("%f seconds taken.\n", (float)duration_ms/1000.f);
     }
 
     delete htmlOut;
