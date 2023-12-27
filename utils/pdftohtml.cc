@@ -96,7 +96,7 @@ bool noRoundedCoordinates = false;
 static bool errQuiet = false;
 static bool noDrm = false;
 double wordBreakThreshold = 10; // 10%, below converted into a coefficient - 0.1
-int jobs = 1;
+static int jobs = 0;
 
 bool showHidden = false;
 bool noMerge = false;
@@ -130,7 +130,7 @@ static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to
                                    { "-noframes", argFlag, &noframes, 0, "generate no frames" },
                                    { "-stdout", argFlag, &stout, 0, "use standard output" },
                                    { "-zoom", argFP, &scale, 0, "zoom the pdf document (default 1.5)" },
-                                   { "-xml", argFlag, &xmlFlag, 0, "output for XML post-processing" },
+                                   { "-xml", argFlag, &xmlFlag, 0, "output for XML post-processing (defaults to all cores" },
                                    { "-noroundcoord", argFlag, &noRoundedCoordinates, 0, "do not round coordinates (with XML output only)" },
                                    { "-hidden", argFlag, &showHidden, 0, "output hidden text" },
                                    { "-nomerge", argFlag, &noMerge, 0, "do not merge paragraphs" },
@@ -313,6 +313,10 @@ int main(int argc, char *argv[])
         error(errCommandLine, -1, "Wrong page range given: the first page ({0:d}) can not be after the last page ({1:d}).", firstPage, lastPage);
         goto error;
     }
+
+	if (jobs == 0) {
+		jobs = std::thread::hardware_concurrency();
+	}
 
     info = doc->getDocInfo();
     if (info.isDict()) {
