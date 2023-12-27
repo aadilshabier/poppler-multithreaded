@@ -82,13 +82,13 @@ static bool rawOrder = true;
 bool printCommands = true;
 static bool printHelp = false;
 bool printHtml = false;
-bool complexMode = false;
-bool singleHtml = false; // singleHtml
+static const bool complexMode = true;
+static const bool singleHtml = false;
 bool dataUrls = false;
 bool ignore = false;
 static char extension[5] = "png";
 static double scale = 1.5;
-bool noframes = false;
+// static const bool noframes = true;
 bool stout = false;
 static const bool xml = true;
 static bool xmlFlag = false;
@@ -99,7 +99,7 @@ double wordBreakThreshold = 10; // 10%, below converted into a coefficient - 0.1
 static int jobs = 0;
 
 bool showHidden = false;
-bool noMerge = false;
+// static const bool noMerge = true;
 bool fontFullName = false;
 static char ownerPassword[33] = "";
 static char userPassword[33] = "";
@@ -121,19 +121,15 @@ static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to
                                    { "-help", argFlag, &printHelp, 0, "print usage information" },
                                    { "--help", argFlag, &printHelp, 0, "print usage information" },
                                    { "-p", argFlag, &printHtml, 0, "exchange .pdf links by .html" },
-                                   { "-c", argFlag, &complexMode, 0, "generate complex document" },
-                                   { "-s", argFlag, &singleHtml, 0, "generate single document that includes all pages" },
 #ifdef HAVE_IN_MEMORY_FILE
                                    { "-dataurls", argFlag, &dataUrls, 0, "use data URLs instead of external images in HTML" },
 #endif
                                    { "-i", argFlag, &ignore, 0, "ignore images" },
-                                   { "-noframes", argFlag, &noframes, 0, "generate no frames" },
                                    { "-stdout", argFlag, &stout, 0, "use standard output" },
                                    { "-zoom", argFP, &scale, 0, "zoom the pdf document (default 1.5)" },
                                    { "-xml", argFlag, &xmlFlag, 0, "output for XML post-processing (defaults to all cores" },
                                    { "-noroundcoord", argFlag, &noRoundedCoordinates, 0, "do not round coordinates (with XML output only)" },
                                    { "-hidden", argFlag, &showHidden, 0, "output hidden text" },
-                                   { "-nomerge", argFlag, &noMerge, 0, "do not merge paragraphs" },
                                    { "-enc", argString, textEncName, sizeof(textEncName), "output text encoding name" },
                                    { "-fmt", argString, extension, sizeof(extension), "image file format for Splash output (png or jpg)" },
                                    { "-v", argFlag, &printVersion, 0, "print copyright and version info" },
@@ -285,21 +281,8 @@ int main(int argc, char *argv[])
         scale = 0.5;
     }
 
-    if (complexMode) {
-        // noframes=false;
+	if (complexMode) {
         stout = false;
-    }
-
-    if (stout) {
-        noframes = true;
-        complexMode = false;
-    }
-
-    if (xml) {
-        complexMode = true;
-        singleHtml = false;
-        noframes = true;
-        noMerge = true;
     }
 
     // get page range

@@ -105,18 +105,18 @@ static inline bool IS_CLOSER(double x, double y, double z)
     return std::fabs((x) - (y)) < std::fabs((x) - (z));
 }
 
-extern bool complexMode;
-extern bool singleHtml;
+static const bool complexMode = true;
+static const bool singleHtml = false;
 extern bool dataUrls;
 extern bool ignore;
 extern bool printCommands;
 extern bool printHtml;
-extern bool noframes;
+static const bool noframes = true;
 extern bool stout;
 static const bool xml = true;
 extern bool noRoundedCoordinates;
 extern bool showHidden;
-extern bool noMerge;
+static const bool noMerge = true;
 
 extern double wordBreakThreshold;
 
