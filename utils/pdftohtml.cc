@@ -90,7 +90,8 @@ static char extension[5] = "png";
 static double scale = 1.5;
 bool noframes = false;
 bool stout = false;
-bool xml = false;
+static const bool xml = true;
+static bool xmlFlag = false;
 bool noRoundedCoordinates = false;
 static bool errQuiet = false;
 static bool noDrm = false;
@@ -129,7 +130,7 @@ static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to
                                    { "-noframes", argFlag, &noframes, 0, "generate no frames" },
                                    { "-stdout", argFlag, &stout, 0, "use standard output" },
                                    { "-zoom", argFP, &scale, 0, "zoom the pdf document (default 1.5)" },
-                                   { "-xml", argFlag, &xml, 0, "output for XML post-processing" },
+                                   { "-xml", argFlag, &xmlFlag, 0, "output for XML post-processing" },
                                    { "-noroundcoord", argFlag, &noRoundedCoordinates, 0, "do not round coordinates (with XML output only)" },
                                    { "-hidden", argFlag, &showHidden, 0, "output hidden text" },
                                    { "-nomerge", argFlag, &noMerge, 0, "do not merge paragraphs" },
@@ -182,10 +183,14 @@ int main(int argc, char *argv[])
         fprintf(stderr, "%s\n", "Copyright 1999-2003 Gueorgui Ovtcharov and Rainer Dorsch");
         fprintf(stderr, "%s\n\n", xpdfCopyright);
         if (!printVersion) {
-            printUsage("pdftohtml", "<PDF-file> [<html-file> <xml-file>]", argDesc);
+            printUsage("pdftohtml -xml", "<PDF-file> [<xml-file>]", argDesc);
         }
         exit(printHelp || printVersion ? 0 : 1);
     }
+	if (not xmlFlag) {
+		fprintf(stderr, "ERROR: This is a modified version of pdftohtml which is only meant to be used with XML files!\n");
+		return EXIT_FAILURE;
+	}
 
     // init error file
     // errorInit();
@@ -347,7 +352,8 @@ int main(int argc, char *argv[])
 		for (int i=0; i<jobs; i++) {
 			int startPage = firstPage + i*d;
 			int endPage = std::min(lastPage, firstPage-1 + (i+1)*d);
-			printf("%d - %d\n", startPage, endPage);
+			if (printCommands)
+				printf("Thread %d(Pages %d to %d)\n", i, startPage, endPage);
 			threads[i] = std::thread(f, doc.get(), i, startPage, endPage);
 		}
 		for (auto &t : threads) {

@@ -67,7 +67,7 @@ void removeStyleSuffix(std::string &familyName)
 }
 
 #define xoutRound(x) ((int)(x + 0.5))
-extern bool xml;
+static const bool xml = true;
 extern bool fontFullName;
 
 HtmlFontColor::HtmlFontColor(GfxRGB rgb, double opacity_)

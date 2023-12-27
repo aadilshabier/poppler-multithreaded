@@ -113,7 +113,7 @@ extern bool printCommands;
 extern bool printHtml;
 extern bool noframes;
 extern bool stout;
-extern bool xml;
+static const bool xml = true;
 extern bool noRoundedCoordinates;
 extern bool showHidden;
 extern bool noMerge;

@@ -28,7 +28,7 @@
 
 #include "HtmlLinks.h"
 
-extern bool xml;
+static const bool xml = true;
 
 HtmlLink::HtmlLink(const HtmlLink &x)
 {
