@@ -1,0 +1,10 @@
+AWS C++ Example: https://towardsaws.com/uploading-files-to-an-aws-s3-bucket-using-c-in-linux-6a09ecf7d6da
+
+Steps to build:
+
+1. mkdir build
+2. cd build
+3. cmake -G Ninja -D CMAKE_CXX_COMPILER=clang++ ..
+4. ninja -j 4 pdftohtml
+5. Run using
+   ./build/utils/pdftohtml -xml Digestive\ System\ Disease\ And\ Discorders\ -\ mix\ of\ text\ and\ images.pdf ./output/Output.xml
