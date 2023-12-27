@@ -45,6 +45,9 @@
 #include "Catalog.h"
 #include "UnicodeMap.h"
 
+#include <vector>
+#include <map>
+
 #define xoutRound(x) ((int)(x + 0.5))
 
 #define DOCTYPE "<!DOCTYPE html>"
@@ -65,6 +68,8 @@ enum UnicodeTextDirection
     textDirRightLeft,
     textDirTopBottom
 };
+
+using Contents = std::vector<std::vector<std::map<std::string, std::string>>>;
 
 class HtmlString
 {
@@ -149,7 +154,7 @@ public:
     // number of images on the current page
     int getNumImages() { return imgList.size(); }
 
-    void dump(FILE *f, int pageNum, const std::vector<std::string> &backgroundImages);
+    void dump(Contents &contents, int pageNum, const std::vector<std::string> &backgroundImages);
 
     // Clear the page.
     void clear();
@@ -169,7 +174,7 @@ private:
     HtmlString *yxCur1, *yxCur2; // cursors for yxStrings list
 
     void setDocName(const char *fname);
-    void dumpAsXML(FILE *f, int page);
+    void dumpAsXML(Contents &contents, int page);
     void dumpComplex(FILE *f, int page, const std::vector<std::string> &backgroundImages);
     int dumpComplexHeaders(FILE *const file, FILE *&pageFile, int page);
 
@@ -281,6 +286,10 @@ public:
 
     bool dumpDocOutline(PDFDoc *doc);
 
+	Contents extractContents() {
+		return std::move(contents);
+	}
+
 private:
     // convert encoding into a HTML standard, or encoding->c_str if not
     // recognized.
@@ -297,7 +306,6 @@ private:
     std::unique_ptr<GooString> createImageFileName(const char *ext);
 
     FILE *fContentsFrame;
-    FILE *page; // html file
     // FILE *tin;                    // image log file
     // bool write;
     bool needClose; // need to close the file?
@@ -315,6 +323,8 @@ private:
     Catalog *catalog;
     Page *docPage;
     std::vector<std::string> backgroundImages;
+	Contents contents;
+
     friend class HtmlPage;
 };
 

@@ -73,8 +73,14 @@
 #include "InMemoryFile.h"
 
 #include <thread>
+#include <future>
 #include <vector>
+#include <fstream>
 #include <cmath>
+
+#include "nlohmann/json.hpp"
+
+using json = nlohmann::json;
 
 static int firstPage = 1;
 static int lastPage = 0;
@@ -326,26 +332,36 @@ int main(int argc, char *argv[])
 
 	// scope to allow goto to worj
 	{
-		const auto f = [=](PDFDoc* doc, int i, int startPage, int endPage) {
-			std::string out_file = "output/file" + std::to_string(i);
+		const auto f = [=](PDFDoc* doc, int i, int startPage, int endPage, std::promise<Contents> promise) {
+			std::string out_file = "output/file";
 			auto out = HtmlOutputDev(doc->getCatalog(), out_file.c_str(), docTitle->c_str(), author ? author->c_str() : nullptr, keywords ? keywords->c_str() : nullptr, subject ? subject->c_str() : nullptr, date ? date->c_str() : nullptr, rawOrder, firstPage, doOutline);
-
 			doc->displayPages(&out, startPage, endPage, 72 * scale, 72 * scale, 0, true, false, false);
 			out.dumpDocOutline(doc);
+			auto r = out.extractContents();
+			promise.set_value(r);
 		};
 
 		std::vector<std::thread> threads(jobs);
+		std::vector<std::future<Contents>> futures(jobs);
 		const int d = ceil(static_cast<float>(lastPage-firstPage+1) / static_cast<float>(jobs));
 		for (int i=0; i<jobs; i++) {
 			int startPage = firstPage + i*d;
 			int endPage = std::min(lastPage, firstPage-1 + (i+1)*d);
 			if (printCommands)
 				printf("Thread %d(Pages %d to %d)\n", i, startPage, endPage);
-			threads[i] = std::thread(f, doc.get(), i, startPage, endPage);
+			std::promise<Contents> promise;
+		    futures[i] = promise.get_future();
+			threads[i] = std::thread(f, doc.get(), i, startPage, endPage, std::move(promise));
 		}
-		for (auto &t : threads) {
-			t.join();
+		json arr = json::array();
+		for (int i=0; i<jobs; i++) {
+		    threads[i].join();
+			auto r = json(futures[i].get());
+			for (auto & x : r)
+				arr.push_back(std::move(x));
 		}
+		std::ofstream json_file("output/file.json");
+		json_file << std::setw(4) << arr << std::endl;
 	}
 
     exit_status = EXIT_SUCCESS;

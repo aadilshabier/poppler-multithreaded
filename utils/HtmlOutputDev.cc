@@ -711,46 +711,24 @@ void HtmlPage::coalesce()
 #endif
 }
 
-void HtmlPage::dumpAsXML(FILE *f, int page)
+void HtmlPage::dumpAsXML(Contents &contents, int page)
 {
-    fprintf(f, "<page number=\"%d\" position=\"absolute\"", page);
-    fprintf(f, " top=\"0\" left=\"0\" height=\"%d\" width=\"%d\">\n", pageHeight, pageWidth);
-
-    for (int i = fontsPageMarker; i < fonts->size(); i++) {
-        GooString *fontCSStyle = fonts->CSStyle(i);
-        fprintf(f, "\t%s\n", fontCSStyle->c_str());
-        delete fontCSStyle;
-    }
+	contents.emplace_back();
 
     for (auto ptr : imgList) {
         auto img = static_cast<HtmlImage *>(ptr);
-        if (!noRoundedCoordinates) {
-            fprintf(f, "<image top=\"%d\" left=\"%d\" ", xoutRound(img->yMin), xoutRound(img->xMin));
-            fprintf(f, "width=\"%d\" height=\"%d\" ", xoutRound(img->xMax - img->xMin), xoutRound(img->yMax - img->yMin));
-        } else {
-            fprintf(f, "<image top=\"%f\" left=\"%f\" ", img->yMin, img->xMin);
-            fprintf(f, "width=\"%f\" height=\"%f\" ", img->xMax - img->xMin, img->yMax - img->yMin);
-        }
-        fprintf(f, "src=\"%s\"/>\n", img->fName->c_str());
+		contents.back().emplace_back();
+		contents.back().back()["type"] = "image";
+		contents.back().back()["src"] = img->fName->c_str();
         delete img;
     }
     imgList.clear();
 
     for (HtmlString *tmp = yxStrings; tmp; tmp = tmp->yxNext) {
-        if (tmp->htext) {
-            if (!noRoundedCoordinates) {
-                fprintf(f, "<text top=\"%d\" left=\"%d\" ", xoutRound(tmp->yMin), xoutRound(tmp->xMin));
-                fprintf(f, "width=\"%d\" height=\"%d\" ", xoutRound(tmp->xMax - tmp->xMin), xoutRound(tmp->yMax - tmp->yMin));
-            } else {
-                fprintf(f, "<text top=\"%f\" left=\"%f\" ", tmp->yMin, tmp->xMin);
-                fprintf(f, "width=\"%f\" height=\"%f\" ", tmp->xMax - tmp->xMin, tmp->yMax - tmp->yMin);
-            }
-            fprintf(f, "font=\"%d\">", tmp->fontpos);
-            fputs(tmp->htext->c_str(), f);
-            fputs("</text>\n", f);
-        }
+		contents.back().emplace_back();
+		contents.back().back()["type"] = "text";
+		contents.back().back()["content"] = tmp->htext->c_str();
     }
-    fputs("</page>\n", f);
 }
 
 static void printCSS(FILE *f)
@@ -913,43 +891,12 @@ void HtmlPage::dumpComplex(FILE *file, int page, const std::vector<std::string> 
     }
 }
 
-void HtmlPage::dump(FILE *f, int pageNum, const std::vector<std::string> &backgroundImages)
+void HtmlPage::dump(Contents &contents, int pageNum, const std::vector<std::string> &backgroundImages)
 {
     if (complexMode || singleHtml) {
         if (xml) {
-            dumpAsXML(f, pageNum);
+            dumpAsXML(contents, pageNum);
         }
-        if (!xml) {
-            dumpComplex(f, pageNum, backgroundImages);
-        }
-    } else {
-        fprintf(f, "<a name=%d></a>", pageNum);
-        // Loop over the list of image names on this page
-        for (auto ptr : imgList) {
-            auto img = static_cast<HtmlImage *>(ptr);
-
-            // see printCSS() for class names
-            const char *styles[4] = { "", " class=\"xflip\"", " class=\"yflip\"", " class=\"xyflip\"" };
-            int style_index = 0;
-            if (img->xMin > img->xMax) {
-                style_index += 1; // xFlip
-            }
-            if (img->yMin > img->yMax) {
-                style_index += 2; // yFlip
-            }
-
-            fprintf(f, "<img%s src=\"%s\"/><br/>\n", styles[style_index], img->fName->c_str());
-            delete img;
-        }
-        imgList.clear();
-
-        for (HtmlString *tmp = yxStrings; tmp; tmp = tmp->yxNext) {
-            if (tmp->htext) {
-                fputs(tmp->htext->c_str(), f);
-                fputs("<br/>\n", f);
-            }
-        }
-        fputs("<hr/>\n", f);
     }
 }
 
@@ -1074,7 +1021,6 @@ HtmlOutputDev::HtmlOutputDev(Catalog *catalogA, const char *fileName, const char
 {
     catalog = catalogA;
     fContentsFrame = nullptr;
-    page = nullptr;
     docTitle = new GooString(title);
     pages = nullptr;
     dumpJPEG = true;
@@ -1129,58 +1075,6 @@ HtmlOutputDev::HtmlOutputDev(Catalog *catalogA, const char *fileName, const char
                 fprintf(fContentsFrame, "<a href=\"%s%s\" target=\"contents\">Outline</a><br/>", gbasename(Docname->c_str()).c_str(), complexMode ? "-outline.html" : "s.html#outline");
             }
         }
-        if (!complexMode) { /* not in complex mode */
-
-            GooString *right = new GooString(fileName);
-            right->append("s.html");
-
-            if (!(page = fopen(right->c_str(), "w"))) {
-                error(errIO, -1, "Couldn't open html file '{0:t}'", right);
-                delete right;
-                return;
-            }
-            delete right;
-            fputs(DOCTYPE, page);
-            fputs("<html>\n<head>\n<title></title>\n", page);
-            printCSS(page);
-            fputs("</head>\n<body>\n", page);
-        }
-    }
-
-    if (noframes) {
-        if (stout) {
-            page = stdout;
-        } else {
-            GooString *right = new GooString(fileName);
-            if (!xml) {
-                right->append(".html");
-            }
-            if (xml) {
-                right->append(".xml");
-            }
-            if (!(page = fopen(right->c_str(), "w"))) {
-                error(errIO, -1, "Couldn't open html file '{0:t}'", right);
-                delete right;
-                return;
-            }
-            delete right;
-        }
-
-        const std::string htmlEncoding = mapEncodingToHtml(globalParams->getTextEncodingName());
-        if (xml) {
-            fprintf(page, "<?xml version=\"1.0\" encoding=\"%s\"?>\n", htmlEncoding.c_str());
-            fputs("<!DOCTYPE pdf2xml SYSTEM \"pdf2xml.dtd\">\n\n", page);
-            fprintf(page, "<pdf2xml producer=\"%s\" version=\"%s\">\n", PACKAGE_NAME, PACKAGE_VERSION);
-        } else {
-            fprintf(page, "%s\n<html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"\" xml:lang=\"\">\n<head>\n<title>%s</title>\n", DOCTYPE, docTitle->c_str());
-
-            fprintf(page, "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=%s\"/>\n", htmlEncoding.c_str());
-
-            dumpMetaVars(page);
-            printCSS(page);
-            fprintf(page, "</head>\n");
-            fprintf(page, "<body bgcolor=\"#A0A0A0\" vlink=\"blue\" link=\"blue\">\n");
-        }
     }
     ok = true;
 }
@@ -1197,15 +1091,6 @@ HtmlOutputDev::~HtmlOutputDev()
     if (fContentsFrame) {
         fputs("</body>\n</html>\n", fContentsFrame);
         fclose(fContentsFrame);
-    }
-    if (page != nullptr) {
-        if (xml) {
-            fputs("</pdf2xml>\n", page);
-            fclose(page);
-        } else if (!complexMode || xml || noframes) {
-            fputs("</body>\n</html>\n", page);
-            fclose(page);
-        }
     }
     if (pages) {
         delete pages;
@@ -1260,7 +1145,7 @@ void HtmlOutputDev::endPage()
 
     pages->conv();
     pages->coalesce();
-    pages->dump(page, pageNum, backgroundImages);
+    pages->dump(contents, pageNum, backgroundImages);
 
     // I don't yet know what to do in the case when there are pages of different
     // sizes and we want complex output: running ghostscript many times
@@ -1666,47 +1551,6 @@ bool HtmlOutputDev::dumpDocOutline(PDFDoc *doc)
     }
 
     if (!complexMode || xml) {
-        output = page;
-    } else if (complexMode && !xml) {
-        if (noframes) {
-            output = page;
-            fputs("<hr/>\n", output);
-        } else {
-            GooString *str = Docname->copy();
-            str->append("-outline.html");
-            output = fopen(str->c_str(), "w");
-            delete str;
-            if (output == nullptr) {
-                return false;
-            }
-            bClose = true;
-
-            const std::string htmlEncoding = HtmlOutputDev::mapEncodingToHtml(globalParams->getTextEncodingName());
-
-            fprintf(output,
-                    "<html xmlns=\"http://www.w3.org/1999/xhtml\" "
-                    "lang=\"\" xml:lang=\"\">\n"
-                    "<head>\n"
-                    "<title>Document Outline</title>\n"
-                    "<meta http-equiv=\"Content-Type\" content=\"text/html; "
-                    "charset=%s\"/>\n"
-                    "</head>\n<body>\n",
-                    htmlEncoding.c_str());
-        }
-    }
-
-    if (!xml) {
-        bool done = newHtmlOutlineLevel(output, outlines);
-        if (done && !complexMode) {
-            fputs("<hr/>\n", output);
-        }
-
-        if (bClose) {
-            fputs("</body>\n</html>\n", output);
-            fclose(output);
-        }
-    } else {
-        newXmlOutlineLevel(output, outlines);
     }
 
     return true;
