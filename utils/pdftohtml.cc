@@ -97,7 +97,7 @@ static double scale = 1.5;
 // static const bool noframes = true;
 bool stout = false;
 static const bool xml = true;
-static bool xmlFlag = false;
+static bool jsonFlag = false;
 bool noRoundedCoordinates = false;
 static bool errQuiet = false;
 static bool noDrm = false;
@@ -118,7 +118,7 @@ static char textEncName[128] = "";
 
 static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to convert" },
                                    { "-l", argInt, &lastPage, 0, "last page to convert" },
-                                   { "-j", argInt, &jobs, 0, "number of jobs" },
+                                   { "-j", argInt, &jobs, 0, "number of jobs (defaults to all cores)" },
                                    /*{"-raw",    argFlag,     &rawOrder,      0,
                                      "keep strings in content stream order"},*/
                                    { "-q", argFlag, &errQuiet, 0, "don't print any messages or errors" },
@@ -133,7 +133,7 @@ static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to
                                    { "-i", argFlag, &ignore, 0, "ignore images" },
                                    { "-stdout", argFlag, &stout, 0, "use standard output" },
                                    { "-zoom", argFP, &scale, 0, "zoom the pdf document (default 1.5)" },
-                                   { "-xml", argFlag, &xmlFlag, 0, "output for XML post-processing (defaults to all cores" },
+                                   { "-json", argFlag, &jsonFlag, 0, "output for JSON post-processing" },
                                    { "-noroundcoord", argFlag, &noRoundedCoordinates, 0, "do not round coordinates (with XML output only)" },
                                    { "-hidden", argFlag, &showHidden, 0, "output hidden text" },
                                    { "-enc", argString, textEncName, sizeof(textEncName), "output text encoding name" },
@@ -185,13 +185,13 @@ int main(int argc, char *argv[])
         fprintf(stderr, "%s\n", "Copyright 1999-2003 Gueorgui Ovtcharov and Rainer Dorsch");
         fprintf(stderr, "%s\n\n", xpdfCopyright);
         if (!printVersion) {
-            printUsage("pdftohtml -xml", "<PDF-file> [<xml-file>]", argDesc);
+            printUsage("pdftohtml -json", "<PDF-file> [<json-file>]", argDesc);
         }
         exit(printHelp || printVersion ? 0 : 1);
     }
-	if (not xmlFlag) {
-		fprintf(stderr, "ERROR: This is a modified version of pdftohtml which is only meant to be used with XML files!\n");
-		return EXIT_FAILURE;
+	if (not jsonFlag) {
+		fprintf(stderr, "ERROR: This is a modified version of pdftohtml which is only meant to be used for JSON output!\n");
+		goto error;
 	}
 
     // init error file
@@ -248,21 +248,12 @@ int main(int argc, char *argv[])
     // construct text file name
     if (argc == 3) {
         GooString *tmp = new GooString(argv[2]);
-        if (!xml) {
-            if (tmp->getLength() >= 5) {
-                const char *p = tmp->c_str() + tmp->getLength() - 5;
-                if (!strcmp(p, ".html") || !strcmp(p, ".HTML")) {
-                    htmlFileName = new GooString(tmp->c_str(), tmp->getLength() - 5);
-                }
-            }
-        } else {
-            if (tmp->getLength() >= 4) {
-                const char *p = tmp->c_str() + tmp->getLength() - 4;
-                if (!strcmp(p, ".xml") || !strcmp(p, ".XML")) {
-                    htmlFileName = new GooString(tmp->c_str(), tmp->getLength() - 4);
-                }
-            }
-        }
+		if (tmp->getLength() >= 5) {
+			const char *p = tmp->c_str() + tmp->getLength() - 5;
+			if (!strcmp(p, ".json") || !strcmp(p, ".JSON")) {
+				htmlFileName = new GooString(tmp->c_str(), tmp->getLength() - 5);
+			}
+		}
         if (!htmlFileName) {
             htmlFileName = new GooString(tmp);
         }
@@ -333,8 +324,7 @@ int main(int argc, char *argv[])
 	// scope to allow goto to worj
 	{
 		const auto f = [=](PDFDoc* doc, int i, int startPage, int endPage, std::promise<Contents> promise) {
-			std::string out_file = "output/file";
-			auto out = HtmlOutputDev(doc->getCatalog(), out_file.c_str(), docTitle->c_str(), author ? author->c_str() : nullptr, keywords ? keywords->c_str() : nullptr, subject ? subject->c_str() : nullptr, date ? date->c_str() : nullptr, rawOrder, firstPage, doOutline);
+			auto out = HtmlOutputDev(doc->getCatalog(), htmlFileName->c_str(), docTitle->c_str(), author ? author->c_str() : nullptr, keywords ? keywords->c_str() : nullptr, subject ? subject->c_str() : nullptr, date ? date->c_str() : nullptr, rawOrder, firstPage, doOutline);
 			doc->displayPages(&out, startPage, endPage, 72 * scale, 72 * scale, 0, true, false, false);
 			out.dumpDocOutline(doc);
 			auto r = out.extractContents();
@@ -360,8 +350,9 @@ int main(int argc, char *argv[])
 			for (auto & x : r)
 				arr.push_back(std::move(x));
 		}
-		std::ofstream json_file("output/file.json");
-		json_file << std::setw(4) << arr << std::endl;
+		std::string jsonFileName = htmlFileName->toStr() + ".json";
+		std::ofstream jsonFile(jsonFileName);
+		jsonFile << std::setw(4) << arr << std::endl;
 	}
 
     exit_status = EXIT_SUCCESS;
