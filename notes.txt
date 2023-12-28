@@ -7,7 +7,7 @@ Steps to build:
 3. cmake -G Ninja -D CMAKE_CXX_COMPILER=clang++ ..
 4. ninja -j 4 pdftohtml
 5. Run using
-   ./build/utils/pdftohtml -xml Digestive\ System\ Disease\ And\ Discorders\ -\ mix\ of\ text\ and\ images.pdf ./output/Output.xml
+   ./build/utils/pdftohtml -json -j 6 Digestive\ System\ Disease\ And\ Discorders\ -\ mix\ of\ text\ and\ images.pdf ./Output.json
 
 Descending the time-spent tree:
 1. Most time is spent in Page::display()
