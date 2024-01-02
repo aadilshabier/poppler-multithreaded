@@ -189,7 +189,7 @@ int main(int argc, char *argv[])
         }
         exit(printHelp || printVersion ? 0 : 1);
     }
-	if (not jsonFlag) {
+	if (!jsonFlag) {
 		fprintf(stderr, "ERROR: This is a modified version of pdftohtml which is only meant to be used for JSON output!\n");
 		goto error;
 	}
