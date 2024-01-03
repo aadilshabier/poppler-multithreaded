@@ -68,15 +68,15 @@
 #include "DateInfo.h"
 #include "goo/gfile.h"
 #include "Win32Console.h"
-#include "InMemoryFile.h"
 
 #include <thread>
 #include <future>
 #include <vector>
-#include <fstream>
 #include <cmath>
 
 #include "nlohmann/json.hpp"
+#include "AWSHelper.h"
+
 
 using json = nlohmann::json;
 
@@ -94,7 +94,6 @@ static char extension[5] = "png";
 static double scale = 1.5;
 // static const bool noframes = true;
 bool stout = false;
-static const bool xml = true;
 static bool jsonFlag = false;
 bool noRoundedCoordinates = false;
 static bool errQuiet = false;
@@ -125,9 +124,6 @@ static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to
                                    { "-help", argFlag, &printHelp, 0, "print usage information" },
                                    { "--help", argFlag, &printHelp, 0, "print usage information" },
                                    { "-p", argFlag, &printHtml, 0, "exchange .pdf links by .html" },
-#ifdef HAVE_IN_MEMORY_FILE
-                                   { "-dataurls", argFlag, &dataUrls, 0, "use data URLs instead of external images in HTML" },
-#endif
                                    { "-i", argFlag, &ignore, 0, "ignore images" },
                                    { "-stdout", argFlag, &stout, 0, "use standard output" },
                                    { "-zoom", argFP, &scale, 0, "zoom the pdf document (default 1.5)" },
@@ -155,6 +151,7 @@ int main(int argc, char *argv[])
     bool ok;
     std::optional<GooString> ownerPW, userPW;
     Object info;
+	auto& aws = AWSHelper::GetInstance();
     int exit_status = EXIT_FAILURE;
 
     Win32Console win32Console(&argc, &argv);
@@ -172,6 +169,10 @@ int main(int argc, char *argv[])
     }
 	if (!jsonFlag) {
 		fprintf(stderr, "ERROR: This is a modified version of pdftohtml which is only meant to be used for JSON output!\n");
+		goto error;
+	}
+
+	if (!aws.IsInit()) {
 		goto error;
 	}
 
@@ -331,9 +332,10 @@ int main(int argc, char *argv[])
 			for (auto & x : r)
 				arr.push_back(std::move(x));
 		}
-		std::string jsonFileName = htmlFileName->toStr() + ".json";
-		std::ofstream jsonFile(jsonFileName);
-		jsonFile << std::setw(4) << arr << std::endl;
+		std::string jsonFileName = htmlFileName->toStr() + "/output.json";
+	    std::shared_ptr<Aws::IOStream> stream = Aws::MakeShared<Aws::StringStream>(AWSHelper::ALLOC_TAG);
+		*stream << arr << std::endl;
+		AWSHelper::GetInstance().PutObject(jsonFileName, stream);
 	}
 
     exit_status = EXIT_SUCCESS;

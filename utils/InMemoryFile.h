@@ -20,7 +20,6 @@
 
 #include <cstdio>
 #include <string>
-#include <vector>
 
 #if defined(__USE_GNU) && !defined(__ANDROID_API__)
 #    define HAVE_IN_MEMORY_FILE (1)
@@ -34,7 +33,7 @@ private:
     size_t iohead = 0;
     FILE *fptr = nullptr;
 #endif
-    std::vector<char> data;
+    std::string data;
 
 #ifdef HAVE_IN_MEMORY_FILE_FOPENCOOKIE
     ssize_t _read(char *buf, size_t sz);
@@ -50,7 +49,7 @@ public:
      * and must be fclosed() by the caller before destruction. */
     FILE *open(const char *mode);
 
-    const std::vector<char> &getBuffer() const { return data; }
+    const std::string &getBuffer() const { return data; }
 };
 
 #endif // IN_MEMORY_FILE_H

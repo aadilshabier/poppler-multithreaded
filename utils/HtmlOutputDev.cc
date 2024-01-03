@@ -79,6 +79,7 @@
 #include "InMemoryFile.h"
 #include "Outline.h"
 #include "PDFDoc.h"
+#include "AWSHelper.h"
 
 #define DEBUG __FILE__ << ": " << __LINE__ << ": DEBUG: "
 
@@ -107,7 +108,6 @@ static inline bool IS_CLOSER(double x, double y, double z)
 
 static const bool complexMode = true;
 static const bool singleHtml = false;
-extern bool dataUrls;
 extern bool ignore;
 extern bool printCommands;
 extern bool printHtml;
@@ -1195,7 +1195,7 @@ void HtmlOutputDev::drawJpegImage(GfxState *state, Stream *str)
 
     // open the image file
     std::unique_ptr<GooString> fName = createImageFileName("jpg");
-    f1 = dataUrls ? ims.open("wb") : fopen(fName->c_str(), "wb");
+    f1 = ims.open("wb");
     if (!f1) {
         error(errIO, -1, "Couldn't open image file '{0:t}'", fName.get());
         return;
@@ -1210,11 +1210,13 @@ void HtmlOutputDev::drawJpegImage(GfxState *state, Stream *str)
         fputc(c, f1);
     }
 
-    fclose(f1);
+	fclose(f1);
 
-    if (dataUrls) {
-        fName = std::make_unique<GooString>(std::string("data:image/jpeg;base64,") + gbase64Encode(ims.getBuffer()));
-    }
+	// Push file to AWS
+    auto& buf = ims.getBuffer();
+	std::shared_ptr<Aws::IOStream> data = Aws::MakeShared<Aws::StringStream>(AWSHelper::ALLOC_TAG, std::move(buf));
+	AWSHelper::GetInstance().PutObject(fName->toStr(), data);
+
     pages->addImage(std::move(fName), state);
 }
 
@@ -1231,7 +1233,7 @@ void HtmlOutputDev::drawPngImage(GfxState *state, Stream *str, int width, int he
 
     // open the image file
     std::unique_ptr<GooString> fName = createImageFileName("png");
-    f1 = dataUrls ? ims.open("wb") : fopen(fName->c_str(), "wb");
+    f1 = ims.open("wb");
     if (!f1) {
         error(errIO, -1, "Couldn't open image file '{0:t}'", fName.get());
         return;
@@ -1331,11 +1333,15 @@ void HtmlOutputDev::drawPngImage(GfxState *state, Stream *str, int width, int he
 
     writer->close();
     delete writer;
+
     fclose(f1);
 
-    if (dataUrls) {
-        fName = std::make_unique<GooString>(std::string("data:image/png;base64,") + gbase64Encode(ims.getBuffer()));
-    }
+	// Push file to AWS
+    auto& buf = ims.getBuffer();
+    std::shared_ptr<Aws::IOStream> data = Aws::MakeShared<Aws::StringStream>(AWSHelper::ALLOC_TAG, std::move(buf));
+
+	AWSHelper::GetInstance().PutObject(fName->toStr(), data);
+
     pages->addImage(std::move(fName), state);
 #else
     return;
@@ -1344,7 +1350,7 @@ void HtmlOutputDev::drawPngImage(GfxState *state, Stream *str, int width, int he
 
 std::unique_ptr<GooString> HtmlOutputDev::createImageFileName(const char *ext)
 {
-    return GooString::format("{0:s}-{1:d}_{2:d}.{3:s}", Docname->c_str(), pageNum, pages->getNumImages() + 1, ext);
+    return GooString::format("{0:s}/images/image-{1:d}_{2:d}.{3:s}", Docname->c_str(), pageNum, pages->getNumImages() + 1, ext);
 }
 
 void HtmlOutputDev::drawImageMask(GfxState *state, Object *ref, Stream *str, int width, int height, bool invert, bool interpolate, bool inlineImg)
