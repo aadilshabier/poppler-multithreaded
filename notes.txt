@@ -1,5 +1,8 @@
 AWS C++ Example: https://towardsaws.com/uploading-files-to-an-aws-s3-bucket-using-c-in-linux-6a09ecf7d6da
 
+Prerequisites:
+aws-sdk-cpp
+
 Steps to build:
 
 1. mkdir build
@@ -16,3 +19,8 @@ Descending the time-spent tree:
 4. This is Gfx::go()
 5. Gfx::opXObject()
 6. Gfx::doImage()
+
+Add this in utils/CMakeLists.txt
+
+find_package(aws-sdk-cpp)
+target_link_libraries(pdftohtml ${common_libs} aws-cpp-sdk-core aws-cpp-sdk-s3)
