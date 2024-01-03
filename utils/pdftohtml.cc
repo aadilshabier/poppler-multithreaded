@@ -62,8 +62,6 @@
 #include "PDFDoc.h"
 #include "PDFDocFactory.h"
 #include "HtmlOutputDev.h"
-#include "SplashOutputDev.h"
-#include "splash/SplashBitmap.h"
 #include "GlobalParams.h"
 #include "PDFDocEncoding.h"
 #include "Error.h"
@@ -145,23 +143,6 @@ static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to
                                    { "-wbt", argFP, &wordBreakThreshold, 0, "word break threshold (default 10 percent)" },
                                    { "-fontfullname", argFlag, &fontFullName, 0, "outputs font full name" },
                                    {} };
-
-class SplashOutputDevNoText : public SplashOutputDev
-{
-public:
-    SplashOutputDevNoText(SplashColorMode colorModeA, int bitmapRowPadA, bool reverseVideoA, SplashColorPtr paperColorA, bool bitmapTopDownA = true)
-        : SplashOutputDev(colorModeA, bitmapRowPadA, reverseVideoA, paperColorA, bitmapTopDownA) { }
-    ~SplashOutputDevNoText() override;
-
-    void drawChar(GfxState *state, double x, double y, double dx, double dy, double originX, double originY, CharCode code, int nBytes, const Unicode *u, int uLen) override { }
-    bool beginType3Char(GfxState *state, double x, double y, double dx, double dy, CharCode code, const Unicode *u, int uLen) override { return false; }
-    void endType3Char(GfxState *state) override { }
-    void beginTextObject(GfxState *state) override { }
-    void endTextObject(GfxState *state) override { }
-    bool interpretType3Chars() override { return false; }
-};
-
-SplashOutputDevNoText::~SplashOutputDevNoText() = default;
 
 int main(int argc, char *argv[])
 {
