@@ -27,7 +27,6 @@ class AWSHelper
 	static AWSHelper& GetInstance();
 	bool IsInit() { return isInit; }
 	bool PutObject(const std::string& objectName, std::shared_ptr<Aws::IOStream> &body);
-	static const char* BUCKET_NAME;
 	static const char* ALLOC_TAG;
  private:
 	AWSHelper(const std::string &bucketName);

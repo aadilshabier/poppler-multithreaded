@@ -77,6 +77,7 @@
 #include "nlohmann/json.hpp"
 #include "AWSHelper.h"
 
+#include <aws/core/utils/UUID.h>
 
 using json = nlohmann::json;
 
@@ -113,6 +114,8 @@ static GooString *getInfoDate(Dict *infoDict, const char *key);
 
 static char textEncName[128] = "";
 
+char bucketNameArg[64] = "";
+
 static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to convert" },
                                    { "-l", argInt, &lastPage, 0, "last page to convert" },
                                    { "-j", argInt, &jobs, 0, "number of jobs (defaults to all cores)" },
@@ -138,6 +141,7 @@ static const ArgDesc argDesc[] = { { "-f", argInt, &firstPage, 0, "first page to
                                    { "-nodrm", argFlag, &noDrm, 0, "override document DRM settings" },
                                    { "-wbt", argFP, &wordBreakThreshold, 0, "word break threshold (default 10 percent)" },
                                    { "-fontfullname", argFlag, &fontFullName, 0, "outputs font full name" },
+								   { "-bucket", argString, bucketNameArg, sizeof(bucketNameArg), "name of AWS S3 bucket"},
                                    {} };
 
 int main(int argc, char *argv[])
@@ -151,7 +155,6 @@ int main(int argc, char *argv[])
     bool ok;
     std::optional<GooString> ownerPW, userPW;
     Object info;
-	auto& aws = AWSHelper::GetInstance();
     int exit_status = EXIT_FAILURE;
 
     Win32Console win32Console(&argc, &argv);
@@ -163,16 +166,22 @@ int main(int argc, char *argv[])
         fprintf(stderr, "%s\n", "Copyright 1999-2003 Gueorgui Ovtcharov and Rainer Dorsch");
         fprintf(stderr, "%s\n\n", xpdfCopyright);
         if (!printVersion) {
-            printUsage("pdftohtml -json", "<PDF-file> [<json-file>]", argDesc);
+            printUsage("pdftohtml -json -bucket <BUCKETNAME>", "<PDF-file> [<OUTPUT-folder>]", argDesc);
         }
         exit(printHelp || printVersion ? 0 : 1);
     }
+
+	if (!strncmp("", bucketNameArg, sizeof(bucketNameArg))) {
+		fprintf(stderr, "ERROR: Please set a bucket name using the -bucket argument!\n");
+		goto error;
+	}
+
 	if (!jsonFlag) {
 		fprintf(stderr, "ERROR: This is a modified version of pdftohtml which is only meant to be used for JSON output!\n");
 		goto error;
 	}
 
-	if (!aws.IsInit()) {
+	if (auto& aws = AWSHelper::GetInstance(); !aws.IsInit()) {
 		goto error;
 	}
 
@@ -229,19 +238,9 @@ int main(int argc, char *argv[])
 
     // construct text file name
     if (argc == 3) {
-        GooString *tmp = new GooString(argv[2]);
-		if (tmp->getLength() >= 5) {
-			const char *p = tmp->c_str() + tmp->getLength() - 5;
-			if (!strcmp(p, ".json") || !strcmp(p, ".JSON")) {
-				htmlFileName = new GooString(tmp->c_str(), tmp->getLength() - 5);
-			}
-		}
-        if (!htmlFileName) {
-            htmlFileName = new GooString(tmp);
-        }
-        delete tmp;
+        htmlFileName = new GooString(argv[2]);
     } else if (fileName->cmp("fd://0") == 0) {
-        error(errCommandLine, -1, "You have to provide an output filename when reading from stdin.");
+        error(errCommandLine, -1, "You have to provide an output folder when reading from stdin.");
         goto error;
     } else {
         const char *p = fileName->c_str() + fileName->getLength() - 4;
@@ -303,7 +302,10 @@ int main(int argc, char *argv[])
 
     doOutline = doc->getOutline()->getItems() != nullptr;
 
-	// scope to allow goto to worj
+	// Append random string to end of filename
+	htmlFileName->append(" - ");
+	htmlFileName->append(Aws::Utils::UUID::RandomUUID());
+	// scope to allow goto to work
 	{
 		const auto f = [=](PDFDoc* doc, int i, int startPage, int endPage, std::promise<Contents> promise) {
 			auto out = HtmlOutputDev(doc->getCatalog(), htmlFileName->c_str(), docTitle->c_str(), author ? author->c_str() : nullptr, keywords ? keywords->c_str() : nullptr, subject ? subject->c_str() : nullptr, date ? date->c_str() : nullptr, rawOrder, firstPage, doOutline);

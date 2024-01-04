@@ -17,8 +17,14 @@ $ cmake ..
 ```sh
 $ make -j 6 pdftohtml
 ```
+4. Make shared configuration and credential files as given in <https://docs.aws.amazon.com/sdkref/latest/guide/file-format.html>
+   On Linux/MacOS, this should be in `~/.aws/config` and `~/.aws/credentials`
 
 4. Use it like this. Replace 6 with the number of threads you want to use
 ```sh
-$ ./utils/pdftohtml -json -j 6 File.pdf Output.json
+$ ./utils/pdftohtml -json -j 6 -bucket my-bucket-name File.pdf
+```
+   To manually provide a filename to the bucket, use it like this
+```sh
+$ ./utils/pdftohtml -json -j 6 -bucket my-bucket-name File.pdf FileOut
 ```
