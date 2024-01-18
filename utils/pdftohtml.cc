@@ -156,6 +156,7 @@ int main(int argc, char *argv[])
     std::optional<GooString> ownerPW, userPW;
     Object info;
     int exit_status = EXIT_FAILURE;
+	bool fileNameGiven = false;
 
     Win32Console win32Console(&argc, &argv);
     // parse args
@@ -238,6 +239,7 @@ int main(int argc, char *argv[])
 
     // construct text file name
     if (argc == 3) {
+		fileNameGiven = true;
         htmlFileName = new GooString(argv[2]);
     } else if (fileName->cmp("fd://0") == 0) {
         error(errCommandLine, -1, "You have to provide an output folder when reading from stdin.");
@@ -302,9 +304,11 @@ int main(int argc, char *argv[])
 
     doOutline = doc->getOutline()->getItems() != nullptr;
 
-	// Append random string to end of filename
-	htmlFileName->append(" - ");
-	htmlFileName->append(Aws::Utils::UUID::RandomUUID());
+	// Append random string to end of filename if filename is not given
+	if (!fileNameGiven) {
+		htmlFileName->append(" - ");
+		htmlFileName->append(Aws::Utils::UUID::RandomUUID());
+	}
 	// scope to allow goto to work
 	{
 		const auto f = [=](PDFDoc* doc, int i, int startPage, int endPage, std::promise<Contents> promise) {
